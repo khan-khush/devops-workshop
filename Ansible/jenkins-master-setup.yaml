@@ -1,33 +1,63 @@
 ---
 - hosts: jenkins-master
-  become: true 
-  tasks: 
-  - name: add jenkins key 
-    apt_key: 
-      url:  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-      state: present 
+  become: true
+  tasks:
+    - name: Add Jenkins key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
 
-  - name: add jenkins repo 
-    apt_repository: 
-      repo: 'deb https://pkg.jenkins.io/debian-stable binary/'
-      state: present 
+    - name: Add Jenkins repo
+      apt_repository:
+        repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+        update_cache: yes
 
-  - name: install java 
-    apt: 
-      name: openjdk-11-jdk
-      state: present
+    - name: Remove Java 17 if installed
+      apt:
+        name: openjdk-17-jdk
+        state: absent
 
-  - name: install jenkins 
-    apt: 
-      name: jenkins 
-      state: present 
+    - name: Install Java (JDK 11)
+      apt:
+        name: openjdk-11-jdk
+        state: present
+    - name: Set Java 11 as default
+      alternatives:
+        name: java
+        path: /usr/lib/jvm/java-11-openjdk-amd64/bin/java
 
-  - name: start jenkins service 
-    service: 
-      name: jenkins 
-      state: started 
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: latest
+        update_cache: yes
+
 
   - name: enable jenkins to start at boot time 
     service: 
       name: jenkins 
       enabled: yes 
+
+    - name: Ensure jenkins.war exists
+      stat:
+        path: /usr/share/java/jenkins.war
+      register: war_check
+
+    - name: Force reinstall Jenkins if war is missing
+      apt:
+        name: jenkins
+        state: latest
+        force: yes
+        when: not war_check.stat.exists
+
+    - name: Start Jenkins service
+      service:
+        name: jenkins
+        state: started
+
+    - name: Enable Jenkins at boot
+      service:
+        name: jenkins
+        enabled: yes 
+
